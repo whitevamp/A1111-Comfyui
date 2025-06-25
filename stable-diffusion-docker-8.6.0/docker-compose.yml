@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  stable-diffusion-webui:
+    image: my-custom-sd-image:latest # Use your newly built image tag
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      #- /workspace:/workspace # This is usually for ephemeral container data or if you install A1111 directly here.
+      # Add your specific bind mounts for models, outputs, etc.
+      #- /path/to/your/sd_models:/stable-diffusion-webui/models # Example for A1111 models
+      #- /path/to/your/sd_outputs:/stable-diffusion-webui/outputs # Example for A1111 outputs
+      # You'll need to adjust these paths based on how your `start.sh` launches the UIs and where they expect models.
+      # The ashleykza base image likely installs A1111 into /workspace/stable-diffusion-webui
+      # So models might be /workspace/stable-diffusion-webui/models
+
+      #Added.
+      #services:
+      # stable-diffusion-webui: # Renamed for clarity, or whatever your service is called
+      # image: ashleykza/stable-diffusion-webui:latest # Your custom image tag
+      # volumes:
+      # General workspace/temp data (if needed by your build)
+      - /workspace:/workspace
+
+      # --- Host Model Mappings to Automatic1111 paths ---
+      # For A1111's main checkpoints:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/checkpoints:/stable-diffusion-webui/models/Stable-diffusion # Host checkpoints to A1111's primary model folder
+      # For A1111's LoRAs:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/loras:/stable-diffusion-webui/loras # A1111 often has loras at the root of its install, not under 'models'
+      # For A1111's embeddings (textual inversions):
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/embeddings:/stable-diffusion-webui/embeddings
+      # For A1111's VAEs:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/VAE:/stable-diffusion-webui/models/VAE # Map your VAEs to A1111's VAE folder
+      # For A1111's Upscalers (if you use uwg-upscaler here, might go under ESRGAN)
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/ESRGAN:/stable-diffusion-webui/models/ESRGAN # If A1111 uses this path for ESRGAN models
+      # A1111 doesn't have a direct 'LyCORIS' folder by default, it usually goes into 'loras' or 'LyCORIS' if an extension creates it.
+      # A1111 doesn't have 'wildcards' or 'uwg-upscaler' in its default `models` structure.
+      # You'll need to check the exact A1111 install path for these if you want them.
+      # If they are managed by an A1111 extension, the extension might create its own folder, e.g.,
+      # - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/wildcards:/stable-diffusion-webui/extensions/sd-webui-wildcards/wildcards
+
+      # --- Host Model Mappings to ComfyUI paths ---
+      # For ComfyUI's checkpoints:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/checkpoints:/ComfyUI/models/checkpoints # Map your host checkpoints to ComfyUI's
+      # For ComfyUI's LoRAs:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/loras:/ComfyUI/models/loras
+      # For ComfyUI's Embeddings:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/embeddings:/ComfyUI/models/embeddings
+      # For ComfyUI's VAEs:
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/VAE:/ComfyUI/models/vae
+      # For ComfyUI's Upscale Models (like ESRGAN):
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/ESRGAN:/ComfyUI/models/upscale_models # Map ESRGAN to upscale_models for ComfyUI
+      # ComfyUI also has specific folders for ControlNet, GLIGEN, etc. If you have those models on your host,
+      # you would add bind mounts for them as well:
+      # - /path/to/your/host_controlnet_models:/ComfyUI/models/controlnet
+      # If LyCORIS models need a separate folder for ComfyUI, you could:
+      # - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/LyCORIS:/ComfyUI/models/loras # Many LyCORIS go into LoRAs or a specific LyCORIS folder
+      # You'd need to confirm ComfyUI's preferred location for `wildcards` and `uwg-upscaler` if they are not standard types.
+
+      # --- Host Output Mapping (for all UIs if they write to the same place) ---
+      - /var/mnt/16TB-Backup/AI_Generation/current_62425_image_out/sd:/stable-diffusion-webui/outputs # A1111 default output
+      - /var/mnt/16TB-Backup/AI_Generation/current_62425_image_out/comfyui:/ComfyUI/output # ComfyUI default output
+
+      # --- SwarmUI specific volumes (from its Docker.md) ---
+      # Assuming SwarmUI is installed at /SwarmUI in the container
+      # SwarmUI often uses /Models and /Output at the root of the container for its own management.
+      # You'll need to decide how to share your root_folder here.
+      # Option 1: Map your root_folder to SwarmUI's general model dir if it can parse it
+      - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new:/SwarmUI/Models # Map your combined root folder to SwarmUI's Models path
+      # Option 2: Map individual subfolders
+      # - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/checkpoints:/SwarmUI/Models/Checkpoints
+      # - /var/mnt/16TB-Backup/AI_Generation/Stable-diffusion/Stable-Diffusion-models-&-MISC/all-new/loras:/SwarmUI/Models/LoRA
+      # And outputs:
+      - /path/to/your/sd_outputs:/SwarmUI/Output
+      # SwarmUI also has a `Data` directory for its internal configurations and `dlbackend` for its self-managed backends.
+      # You might want to bind mount these for persistence.
+      - /path/to/your/swarmui_data:/SwarmUI/Data # For SwarmUI configs/settings
+      - /path/to/your/swarmui_dlbackend:/SwarmUI/dlbackend # For SwarmUI's internal A1111/ComfyUI installs
+      # End add.
+
+    ports:
+      - "7860:7860" # Automatic1111 Stable Diffusion Web UI
+      - "8188:8188" # ComfyUI (common default, confirm with install_comfyui.sh or ComfyUI's startup)
+      - "9090:9090" # InvokeAI (common default, confirm with install_invokeai.sh or InvokeAI's startup)
+      - "7801:7801" # for SwarmUI
+    environment:
+      # Removed JUPYTER_PASSWORD
+      # Removed ENABLE_TENSORBOARD
+      # Add any other environment variables your customized start.sh needs
+    restart: unless-stopped
